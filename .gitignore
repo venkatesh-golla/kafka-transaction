@@ -1,0 +1,100 @@
+# ==================================================
+# Root .gitignore for Spring Boot + Kafka + Docker
+# IntelliJ + Maven Multi-Service Project
+# ==================================================
+
+# -----------------------------
+# IntelliJ IDEA
+# -----------------------------
+.idea/
+*.iml
+out/
+
+# -----------------------------
+# VS Code (if used)
+# -----------------------------
+.vscode/
+
+# -----------------------------
+# Maven / Java Build Outputs
+# -----------------------------
+target/
+*/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# -----------------------------
+# Logs
+# -----------------------------
+*.log
+logs/
+*/logs/
+
+# -----------------------------
+# Spring Boot Runtime Files
+# -----------------------------
+*.pid
+*.seed
+*.pid.lock
+
+# -----------------------------
+# OS Files
+# -----------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------------
+# Environment / Secrets
+# -----------------------------
+.env
+.env.*
+*.env
+
+# Application secrets / local configs
+application-local.yml
+application-local.yaml
+application-secret.yml
+application-secret.yaml
+application-dev-local.yml
+application-dev-local.yaml
+
+# If using custom config folders
+config/local/
+config/secrets/
+
+# -----------------------------
+# Docker Overrides / Local Files
+# -----------------------------
+docker-compose.override.yml
+*.tmp
+
+# -----------------------------
+# Test Reports / Coverage
+# -----------------------------
+surefire-reports/
+failsafe-reports/
+coverage/
+jacoco.exec
+
+# -----------------------------
+# Node (if frontend exists later)
+# -----------------------------
+node_modules/
+dist/
+
+# -----------------------------
+# Kafka Local Data (if mounted locally)
+# Uncomment if using local folders
+# -----------------------------
+# kafka-data/
+# zookeeper-data/
+
+# -----------------------------
+# Misc
+# -----------------------------
+*.swp
+*.bak
+*.tmp
