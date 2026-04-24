@@ -1,7 +1,10 @@
 package com.appsdeveloperblog.estore.transfers.service;
 
+import com.appsdeveloperblog.estore.transfers.io.TransferEntity;
+import com.appsdeveloperblog.estore.transfers.io.TransferRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -16,60 +19,80 @@ import com.appsdeveloperblog.estore.transfers.model.TransferRestModel;
 import com.appsdeveloperblog.payments.ws.core.events.DepositRequestedEvent;
 import com.appsdeveloperblog.payments.ws.core.events.WithdrawalRequestedEvent;
 
+import java.util.UUID;
+
 @Service
 public class TransferServiceImpl implements TransferService {
-	private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+  private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
-	private KafkaTemplate<String, Object> kafkaTemplate;
-	private Environment environment;
-	private RestTemplate restTemplate;
+  private KafkaTemplate<String, Object> kafkaTemplate;
+  private Environment environment;
+  private RestTemplate restTemplate;
+  private TransferRepository transferRepository;
 
-	public TransferServiceImpl(KafkaTemplate<String, Object> kafkaTemplate, Environment environment,
-			RestTemplate restTemplate) {
-		this.kafkaTemplate = kafkaTemplate;
-		this.environment = environment;
-		this.restTemplate = restTemplate;
-	}
+  public TransferServiceImpl(
+      KafkaTemplate<String, Object> kafkaTemplate,
+      Environment environment,
+      RestTemplate restTemplate,
+      TransferRepository transferRepository) {
+    this.kafkaTemplate = kafkaTemplate;
+    this.environment = environment;
+    this.restTemplate = restTemplate;
+    this.transferRepository = transferRepository;
+  }
 
-	@Transactional(value = "kafkaTransactionManager")
-	@Override
-	public boolean transfer(TransferRestModel transferRestModel) {
-		WithdrawalRequestedEvent withdrawalEvent = new WithdrawalRequestedEvent(transferRestModel.getSenderId(),
-				transferRestModel.getRecepientId(), transferRestModel.getAmount());
-		DepositRequestedEvent depositEvent = new DepositRequestedEvent(transferRestModel.getSenderId(),
-				transferRestModel.getRecepientId(), transferRestModel.getAmount());
+  @Transactional("transactionManager")
+  @Override
+  public boolean transfer(TransferRestModel transferRestModel) {
+    WithdrawalRequestedEvent withdrawalEvent =
+        new WithdrawalRequestedEvent(
+            transferRestModel.getSenderId(),
+            transferRestModel.getRecepientId(),
+            transferRestModel.getAmount());
+    DepositRequestedEvent depositEvent =
+        new DepositRequestedEvent(
+            transferRestModel.getSenderId(),
+            transferRestModel.getRecepientId(),
+            transferRestModel.getAmount());
 
-		try {
-			kafkaTemplate.send(environment.getProperty("withdraw-money-topic", "withdraw-money-topic"),
-					withdrawalEvent);
-			LOGGER.info("Sent event to withdrawal topic.");
+    TransferEntity transferEntity = new TransferEntity();
+    BeanUtils.copyProperties(transferRestModel, transferEntity);
+    transferEntity.setTransferId(UUID.randomUUID().toString());
 
-			// Business logic that causes and error
-			callRemoteServce();
+    try {
+      transferRepository.save(transferEntity);
 
-			kafkaTemplate.send(environment.getProperty("deposit-money-topic", "deposit-money-topic"), depositEvent);
-			LOGGER.info("Sent event to deposit topic");
+      kafkaTemplate.send(
+          environment.getProperty("withdraw-money-topic", "withdraw-money-topic"), withdrawalEvent);
+      LOGGER.info("Sent event to withdrawal topic.");
 
-		} catch (Exception ex) {
-			LOGGER.error(ex.getMessage(), ex);
-			throw new TransferServiceException(ex);
-		}
+      // Business logic that causes and error
+      callRemoteServce();
 
-		return true;
-	}
+      kafkaTemplate.send(
+          environment.getProperty("deposit-money-topic", "deposit-money-topic"), depositEvent);
+      LOGGER.info("Sent event to deposit topic");
 
-	private ResponseEntity<String> callRemoteServce() throws Exception {
-		String requestUrl = "http://localhost:8082/response/200";
-		ResponseEntity<String> response = restTemplate.exchange(requestUrl, HttpMethod.GET, null, String.class);
+    } catch (Exception ex) {
+      LOGGER.error(ex.getMessage(), ex);
+      throw new TransferServiceException(ex);
+    }
 
-		if (response.getStatusCode().value() == HttpStatus.SERVICE_UNAVAILABLE.value()) {
-			throw new Exception("Destination Microservice not availble");
-		}
+    return true;
+  }
 
-		if (response.getStatusCode().value() == HttpStatus.OK.value()) {
-			LOGGER.info("Received response from mock service: " + response.getBody());
-		}
-		return response;
-	}
+  private ResponseEntity<String> callRemoteServce() throws Exception {
+    String requestUrl = "http://localhost:8082/response/200";
+    ResponseEntity<String> response =
+        restTemplate.exchange(requestUrl, HttpMethod.GET, null, String.class);
 
+    if (response.getStatusCode().value() == HttpStatus.SERVICE_UNAVAILABLE.value()) {
+      throw new Exception("Destination Microservice not availble");
+    }
+
+    if (response.getStatusCode().value() == HttpStatus.OK.value()) {
+      LOGGER.info("Received response from mock service: " + response.getBody());
+    }
+    return response;
+  }
 }
